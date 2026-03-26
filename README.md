@@ -57,15 +57,18 @@ DataLoggingVehicleModule
 
 ### Build the project
 
-```bash
+```
+bash
 mkdir build
 cd build
 cmake ..
-make```
+make
+```
 
 ### Running the System
 
 Run each module in a separate terminal:
+
 ```
 ./SimpleSensorMonitor
 ./BatteryTemperatureVehicleModule
