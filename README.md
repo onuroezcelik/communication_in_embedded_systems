@@ -98,18 +98,19 @@ Wrote SPI flash page: 0
 ## Project Instructions
 
 ### SimpleTemperatureMonitor
-#### Configured the I2C controller
-### I2C Configuration
 
-The I2C controller is initialized using the hardware register at address `0xFF000030`.
+### Configure the I2C hardware controller
 
-The following configuration is applied:
-- Clock speed: 100 kHz
-- Mode: Host
-- Bus idle state: Low
-- Clock edge: Rising
+The lin_write_config function in LIN.h is used to set the LIN configuration register.
+The LIN hardware controller is set to match the given requirements:
 
-These settings are combined into the I2C configuration register before communication with the temperature sensor begins.
+9600 bps baud rate
+1 Start bit
+1 Stop bit
+8 Data bits
+No Parity bits
+No flow control
+LIN mode
 
 ```
 #define I2C_HW_ADDR 0xFF000030
@@ -124,6 +125,38 @@ These settings are combined into the I2C configuration register before communica
     // Apply configuration
     i2c_write_config(I2C_HW_ADDR, i2c_config);
 ````
+
+### Configure the LIN hardware controller
+The lin_write_config function in LIN.h is used to set the LIN configuration register.
+The LIN hardware controller should be set to match the given requirements:
+
+9600 bps baud rate
+1 Start bit
+1 Stop bit
+8 Data bits
+No Parity bits
+No flow control
+LIN mode
+
+```
+#define LIN_HW_ADDR 0xFF000040
+
+    // Configure the LIN controller
+    uint32_t lin_config =
+        LIN_BAUD_RATE_9600 |
+        LIN_START_BITS_1 |
+        LIN_STOP_BITS_1 |
+        LIN_DATA_BITS_8 |
+        LIN_PARITY_NONE |
+        LIN_NO_FLOW_CONTROL |
+        LIN_MODE_FOLLOWER;
+
+    // Apply configuration
+    lin_write_config(LIN_HW_ADDR, lin_config);
+```
+
+### Implement expected polling and response
+
 
 - Implemented periodic temperature reading from the sensor
 - Stored recent samples to compute average temperature
