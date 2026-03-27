@@ -98,21 +98,15 @@ Current time data: 1774526781
 Wrote SPI flash page: 0
 ```
 ## Project Instructions
-
 ### SimpleTemperatureMonitor
-
 ### Configure the I2C hardware controller
-
-The lin_write_config function in LIN.h is used to set the LIN configuration register.
-The LIN hardware controller is set to match the given requirements:
-
-9600 bps baud rate
-1 Start bit
-1 Stop bit
-8 Data bits
-No Parity bits
-No flow control
-LIN mode
+The i2c_write_config function in I2C.h is used to set the I2C configuration register.
+The I2C hardware controller should be set to match the given requirements:
+- The I2C hardware address is 0xFF000030
+- 100 KHz clock
+- I2C host
+- Bus Idle Low
+- Clock Rising Edge.
 
 ```
 #define I2C_HW_ADDR 0xFF000030
@@ -131,7 +125,6 @@ LIN mode
 ### Configure the LIN hardware controller
 The lin_write_config function in LIN.h is used to set the LIN configuration register.
 The LIN hardware controller should be set to match the given requirements:
-
 9600 bps baud rate
 1 Start bit
 1 Stop bit
