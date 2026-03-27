@@ -299,25 +299,65 @@ void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_
 }
 ```
 For each supported CAN request:
-
-If the request is for average temperature, send g_avg_temp
-If the request is for current temperature, send g_current_temp
-If the request is for time, send g_timestamp as 4 bytes
-Clear the CAN interrupt before leaving the ISR
+- If the request is for average temperature, send g_avg_temp
+- If the request is for current temperature, send g_current_temp
+- If the request is for time, send g_timestamp as 4 bytes
+- Clear the CAN interrupt before leaving the ISR
 
 #### Clear CAN and LIN ISR
+Clear the CAN interrupt before exiting the CAN ISR.
+Clear the LIN interrupt before exiting the LIN ISR
 ```
+can_clear_rx_packet_interrupt();
+lin_clear_frame_resp_interrupt();
 ```
 #### Implement requests for the current and average temperature
+Periodically request the current temperature and average temperature from any support LIN peripherals on the bus by writing the frame headers to the LIN bus
+- Should request the data every 500 milliseconds
+- Save a timestamp for each request
 ```
+    while(true) {
+       
+        // Request average temperature from the temperature module
+        g_timestamp = static_cast<uint32_t>(TIME_NOW_S());
+        lin_write_frame_header(LIN_AVG_TEMP_SENSOR_ID);
+
+        // Request current temperature from the temperature module
+        g_timestamp = static_cast<uint32_t>(TIME_NOW_S());
+        lin_write_frame_header(LIN_CURRENT_TEMP_SENSOR_ID);
+
+        // for every 500 ms
+        SLEEP_MS(500);
+
+    }
 ```
 
 ### DataLoggingVehicleModule
-- Configured CAN and SPI controllers
-- Sent periodic CAN RTR requests
-- Implemented CAN ISR to receive data frames
-- Buffered received samples (temperature + timestamp)
-- Wrote buffered data to SPI flash in page-sized chunks
+#### Configure the CAN and SPI hardware controllers
+The CAN hardware controller should be set to match the given requirements:
+- Baud Rate 100 kbps
+- 11 bit format
+The SPI hardware controller should be set to match the given requirements:
+- 1 MHz clock rate
+```
+    // Configure the SPI and CAN controllers;
+    
+    uint32_t spi_config =
+        SPI_CLK_1MHZ |
+        SPI_HOST |
+        SPI_IDLE_LOW |
+        SPI_CLK_RISING_EDGE;
+
+    spi_write_config(SPI_HARDWARE_REGISTER, spi_config);
+
+    uint32_t can_config =
+        CAN_BAUD_RATE_100K |
+        CAN_FORMAT_11BIT;
+
+    can_write_config(CAN_HARDWARE_REGISTER, can_config);
+```
+#### Implement the CAN ISR to temporarily store data until an entire page can be saved
+#### Write temperature data and timestamps to SPI Flash
 
 ## Built With
 
