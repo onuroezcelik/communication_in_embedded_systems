@@ -91,12 +91,12 @@ System behavior was validated by:
 - Validating SPI flash page writes
 
 Example output from DataLoggingVehicleModule:
-
+```
 Average temperature data: 59
 Current temperature data: 60
 Current time data: 1774526781
 Wrote SPI flash page: 0
-
+```
 ## Project Instructions
 
 ### SimpleTemperatureMonitor
