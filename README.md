@@ -357,7 +357,146 @@ The SPI hardware controller should be set to match the given requirements:
     can_write_config(CAN_HARDWARE_REGISTER, can_config);
 ```
 #### Implement the CAN ISR to temporarily store data until an entire page can be saved
+The CAN ISR should be setup similar to the Battery Temperature Vehicle Module, but instead of sending CAN data frames, it should store the appropriate temperature and time data until an entire page can be saved/written to SPI.
+
+The CAN ISR should filter for the data frames with the CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_CURRENT_TEMP_11_SENSOR_ID, and CAN_TIME_11_SENSOR_ID IDs.
+```
+void can_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t len) {
+    // we can not save the page in the isr, too slow
+    // so you need to accomodate for this in the main loop
+
+    // Do something with the CAN packet
+    if (type == CAN_DATA_FRAME) {
+        if (id == CAN_AVG_TEMPERATURE_11_SENSOR_ID && len >= 1) {
+            g_pending_avg_temp = data[0];
+            g_has_avg_temp = true;
+
+            printf("Average temperature data: %d\n", data[0]);
+            try_commit_sample();
+
+        } else if (id == CAN_CURRENT_TEMP_11_SENSOR_ID && len >= 1) {
+            g_pending_current_temp = data[0];
+            g_has_current_temp = true;
+
+            printf("Current temperature data: %d\n", data[0]);
+            try_commit_sample();
+
+        } else if (id == CAN_TIME_11_SENSOR_ID && len >= 4) {
+            g_pending_time =
+                static_cast<unsigned int>(data[0]) |
+                (static_cast<unsigned int>(data[1]) << 8) |
+                (static_cast<unsigned int>(data[2]) << 16) |
+                (static_cast<unsigned int>(data[3]) << 24);
+
+            g_has_time = true;
+
+            printf("Current time data: %u\n", g_pending_time);
+            try_commit_sample();
+
+        } else {
+            printf("Unknown CAN packet received\n");
+        }
+    } else {
+        printf("Unknown CAN packet received\n");
+    }
+
+    // Clear the can interrupt before exit isr:
+    can_clear_rx_packet_interrupt();
+}
+```
+The ISR filters incoming CAN frames by:
+- Checking type == CAN_DATA_FRAME
+- Matching the IDs:
+  - CAN_AVG_TEMPERATURE_11_SENSOR_ID
+  - CAN_CURRENT_TEMP_11_SENSOR_ID
+  - CAN_TIME_11_SENSOR_ID
+Instead of sending CAN responses (as in the previous module), the ISR:
+- Stores the received values in temporary variables:
+  - g_pending_avg_temp
+  - g_pending_current_temp
+  - g_pending_time
+- Sets corresponding flags to indicate valid data
+The function try_commit_sample() is then called to:
+- Combine avg temperature, current temperature, and time into a single data point
+- Store it into a page buffer (g_page_buffer)
+This mechanism ensures that:
+Data is accumulated until a full SPI flash page is ready to be written, instead of writing inside the ISR
+
+The function for “until an entire page can be saved/written to SPI”
+```
+static void try_commit_sample() {
+    if (g_has_avg_temp && g_has_current_temp && g_has_time) {
+        if (g_page_buffer_count < SPI_FLASH_DATA_PTS_PER_PAGE) {
+            g_page_buffer[g_page_buffer_count].avg_temp = g_pending_avg_temp;
+            g_page_buffer[g_page_buffer_count].current_temp = g_pending_current_temp;
+            g_page_buffer[g_page_buffer_count].time = g_pending_time;
+            g_page_buffer_count++;
+        }
+
+        g_has_avg_temp = false;
+        g_has_current_temp = false;
+        g_has_time = false;
+    }
+}
+```
+
 #### Write temperature data and timestamps to SPI Flash
+After regularly polling
+Use the pre-processor definition SPI_FLASH_DATA_PTS_PER_PAGE to identify when you are ready to write a page in the SPI flash, which is whenever a page is full.
+- The SPI Flash is on CS1, not CS0
+- The SPI Flash has a Page size of 64 bytes defined as SPI_FLASH_PAGE_SIZE in SPI.h
+- The SPI Flash has a total size of 4096 bytes defined as SPI_FLASH_SZ in SPI.h
+- A SPI Flash must be written to in pages, not bytes
+- A SPI Flash will return an error if you attemp to write to a page that is not erased
+- The SPI Flash expects the MOSI data to look like the following
+| Flash Command | Page Number | Data 1 | Data 2 | ... | Data 64 |
+- The available flash commands area (SPI.h):
+  - SPI_FLASH_CMD_WRITE
+  - SPI_FLASH_CMD_READ
+  - SPI_FLASH_CMD_ERASE
+ 
+Detect when a full page is ready
+```
+if (g_page_buffer_count >= SPI_FLASH_DATA_PTS_PER_PAGE) {
+    write_page_to_spi_flash();
+}
+```
+
+Write a full page to SPI flash
+```
+static void write_page_to_spi_flash() {
+    if (g_page_buffer_count < SPI_FLASH_DATA_PTS_PER_PAGE) {
+        return;
+    }
+
+    uint8_t erase_buf[2];
+    erase_buf[0] = SPI_FLASH_CMD_ERASE;
+    erase_buf[1] = g_current_flash_page;
+
+    SPI_xmit_t erase_xmit;
+    erase_xmit.cmd = SPI_FLASH_CMD_ERASE;
+    erase_xmit.len = 2;
+    erase_xmit.data = erase_buf;
+
+    spi_write_data(&erase_xmit, SPI_CS_1);
+
+    uint8_t write_buf[2 + SPI_FLASH_PAGE_SIZE];
+    write_buf[0] = SPI_FLASH_CMD_WRITE;
+    write_buf[1] = g_current_flash_page;
+
+    std::memcpy(&write_buf[2], g_page_buffer, SPI_FLASH_PAGE_SIZE);
+
+    SPI_xmit_t write_xmit;
+    write_xmit.cmd = SPI_FLASH_CMD_WRITE;
+    write_xmit.len = 2 + SPI_FLASH_PAGE_SIZE;
+    write_xmit.data = write_buf;
+
+    spi_write_data(&write_xmit, SPI_CS_1);
+
+    g_current_flash_page++;
+    g_page_buffer_count = 0;
+}
+```
 
 ## Built With
 
