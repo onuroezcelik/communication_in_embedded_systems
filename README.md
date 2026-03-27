@@ -159,6 +159,8 @@ while(true) {
     std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_DURATION_MS));
 }
 ```
+This also shows that the loop runs every 1000 ms (i.e., once per second).
+
 - Read 8-bit temperature sensor data at i2c address 0x20
 ```
 #define ADC_ADDR 0x20
@@ -173,6 +175,7 @@ i2c_write_data(ADC_ADDR, &reg, 1);
 // Read 8-bit temperature sensor data
 i2c_read_data(ADC_ADDR, &temp_val, 1);
 ```
+
 - Cache the latest temperature sensor data to send over LIN
 ```
 g_current_val = temp_val;
@@ -182,6 +185,8 @@ i2c_read_data(ADC_ADDR, &temp_val, 1);
 // Cache latest temperature sensor data
 g_current_val = temp_val;
 ```
+This line stores the last read temperature in g_current_val. Then this value can be used when a LIN request is received.
+
 Respond to LIN average temperature and LIN current temperature IDs in lin_rx_isr function
 - Send the average temperature over LIN if the interrupt comes from LIN_AVG_TEMP_SENSOR_ID
 ```
@@ -191,6 +196,11 @@ if(id == LIN_AVG_TEMP_SENSOR_ID) {
     lin_write_response_data(LIN_AVG_TEMP_SENSOR_ID, &avg_temp, 1);
 }
 ```
+This part:
+It checks whether the received interrupt ID is LIN_AVG_TEMP_SENSOR_ID,
+calculates the average using calculate_average(),
+and sends it over LIN.
+
 - Send the latest temperature over LIN if the interrupt comes from LIN_CURRENT_TEMP_SENSOR_ID
 ```
 else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
@@ -198,11 +208,16 @@ else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
     lin_write_response_data(LIN_CURRENT_TEMP_SENSOR_ID, &g_current_val, 1);
 }
 ```
+This part:
+If the received ID is LIN_CURRENT_TEMP_SENSOR_ID,
+it sends the latest temperature stored in the cache (g_current_val) over LIN.
+
 - Clear the ISR
 ```
 // Clear the lin interrupt before exit isr:
 lin_clear_rx_frame_interrupt();
 ```
+This also clears the interrupt flag at the end of the ISR.
 
 
 ### BatteryTemperatureVehicleModule
