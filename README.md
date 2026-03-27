@@ -221,13 +221,96 @@ This also clears the interrupt flag at the end of the ISR.
 
 
 ### BatteryTemperatureVehicleModule
-- Configured LIN as master
-- Periodically requested temperature data from the sensor module
-- Stored received temperature values
-- Implemented CAN ISR to respond to RTR frames with:
-  - Current temperature
-  - Average temperature
-  - Current timestamp
+#### Configure the LIN main hardware controller
+The lin_write_config function in LIN.h is used to set the LIN configuration register.
+The LIN hardware controller should be set to match the given requirements:
+- 9600 bps baud rate
+- 1 Start bit
+- 1 Stop bit
+- 8 Data bits
+- No Parity bits
+- No flow control
+- LIN master mode
+```
+    // Configure the LIN controller and CAN controller here:
+    uint32_t lin_config =
+        LIN_BAUD_RATE_9600 |
+        LIN_START_BITS_1 |
+        LIN_STOP_BITS_1 |
+        LIN_DATA_BITS_8 |
+        LIN_PARITY_NONE |
+        LIN_NO_FLOW_CONTROL |
+        LIN_MODE_LEADER;
+    
+    lin_write_config(0xFF000040, lin_config);
+```
+#### Configure the CAN hardware controller
+The CAN hardware controller should be set to match the given requirements:
+- Baud Rate 100 kbps
+- 11-bit format
+```
+    // Configure the CAN controller
+    uint32_t can_config =
+        CAN_BAUD_RATE_100K |
+        CAN_FORMAT_11BIT;
+
+    can_write_config(CAN_HARDWARE_REGISTER, can_config);
+```
+#### Implement the CAN ISR to respond to CAN requests
+Respond to CAN Request frames using the can_send_new_packet function for the following CAN IDs defined in CAN.h.
+- CAN_AVG_TEMPERATURE_11_SENSOR_ID= 0x14f
+  - Setup a CAN DATA frame to send average temperature
+- CAN_CURRENT_TEMP_11_SENSOR_ID = 0x15f
+  - Setup a CAN DATA frame to send the current temperature
+- CAN_TIME_11_SENSOR_ID = 0x18f
+  - Setup a CAN DATA frame to send the current time
+```
+void can_new_packet_isr(uint32_t id, CAN_FRAME_TYPES type, uint8_t *data, uint8_t len) {
+       
+    if(id == CAN_AVG_TEMPERATURE_11_SENSOR_ID && type == CAN_RTR_FRAME) {
+        if (!g_avg_ready) return;
+
+        uint8_t avg_data[1] = { g_avg_temp };
+
+        // Setup CAN DATA frame to send the avg temperature data
+        can_send_new_packet(CAN_AVG_TEMPERATURE_11_SENSOR_ID, CAN_DATA_FRAME, avg_data, 1);
+
+    } else if (id == CAN_CURRENT_TEMP_11_SENSOR_ID && type == CAN_RTR_FRAME) {
+        if (!g_current_ready) return;
+
+        uint8_t current_data[1] = { g_current_temp };
+
+        // Setup CAN DATA frame to send the current temperature data
+        can_send_new_packet(CAN_CURRENT_TEMP_11_SENSOR_ID, CAN_DATA_FRAME, current_data, 1);
+
+    } else if (id == CAN_TIME_11_SENSOR_ID) {
+        uint8_t time_data[4];
+        time_data[0] = static_cast<uint8_t>(g_timestamp & 0xFF);
+        time_data[1] = static_cast<uint8_t>((g_timestamp >> 8) & 0xFF);
+        time_data[2] = static_cast<uint8_t>((g_timestamp >> 16) & 0xFF);
+        time_data[3] = static_cast<uint8_t>((g_timestamp >> 24) & 0xFF);
+
+        // Setup CAN DATA frame to send the current time data
+        can_send_new_packet(CAN_TIME_11_SENSOR_ID, CAN_DATA_FRAME, time_data, 4);
+    }
+
+    // Clear the can interrupt before exit isr:
+    can_clear_rx_packet_interrupt();
+}
+```
+For each supported CAN request:
+
+If the request is for average temperature, send g_avg_temp
+If the request is for current temperature, send g_current_temp
+If the request is for time, send g_timestamp as 4 bytes
+Clear the CAN interrupt before leaving the ISR
+
+#### Clear CAN and LIN ISR
+```
+```
+#### Implement requests for the current and average temperature
+```
+```
 
 ### DataLoggingVehicleModule
 - Configured CAN and SPI controllers
