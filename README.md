@@ -344,9 +344,7 @@ The SPI hardware controller should be set to match the given requirements:
     
     uint32_t spi_config =
         SPI_CLK_1MHZ |
-        SPI_HOST |
-        SPI_IDLE_LOW |
-        SPI_CLK_RISING_EDGE;
+        SPI_CS_1 ;
 
     spi_write_config(SPI_HARDWARE_REGISTER, spi_config);
 
