@@ -151,13 +151,59 @@ LIN mode
 ```
 
 ### Implement expected polling and response
+- Poll the current temperature every 1 second
+```
+#define SLEEP_DURATION_MS 1000
+while(true) {
+    ...
+    std::this_thread::sleep_for(std::chrono::milliseconds(SLEEP_DURATION_MS));
+}
+```
+- Read 8-bit temperature sensor data at i2c address 0x20
+```
+#define ADC_ADDR 0x20
+#define ADC_REG  0x00
 
+uint8_t temp_val = 0;
+uint8_t reg = ADC_REG;
 
-- Implemented periodic temperature reading from the sensor
-- Stored recent samples to compute average temperature
-- Responded to LIN requests with:
-  - Current temperature
-  - Average temperature
+// Select ADC register
+i2c_write_data(ADC_ADDR, &reg, 1);
+
+// Read 8-bit temperature sensor data
+i2c_read_data(ADC_ADDR, &temp_val, 1);
+```
+- Cache the latest temperature sensor data to send over LIN
+```
+g_current_val = temp_val;
+// Read 8-bit temperature sensor data
+i2c_read_data(ADC_ADDR, &temp_val, 1);
+
+// Cache latest temperature sensor data
+g_current_val = temp_val;
+```
+Respond to LIN average temperature and LIN current temperature IDs in lin_rx_isr function
+- Send the average temperature over LIN if the interrupt comes from LIN_AVG_TEMP_SENSOR_ID
+```
+if(id == LIN_AVG_TEMP_SENSOR_ID) {
+    uint8_t avg_temp = calculate_average();
+    printf("LIN avg temp request received, sending: %d\n", avg_temp);
+    lin_write_response_data(LIN_AVG_TEMP_SENSOR_ID, &avg_temp, 1);
+}
+```
+- Send the latest temperature over LIN if the interrupt comes from LIN_CURRENT_TEMP_SENSOR_ID
+```
+else if(id == LIN_CURRENT_TEMP_SENSOR_ID) {
+    printf("LIN current temp request received, sending: %d\n", g_current_val);
+    lin_write_response_data(LIN_CURRENT_TEMP_SENSOR_ID, &g_current_val, 1);
+}
+```
+- Clear the ISR
+```
+// Clear the lin interrupt before exit isr:
+lin_clear_rx_frame_interrupt();
+```
+
 
 ### BatteryTemperatureVehicleModule
 - Configured LIN as master
