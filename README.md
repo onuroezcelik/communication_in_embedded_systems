@@ -42,15 +42,16 @@ The system consists of three modules:
 ---
 
 ## Communication Flow
+```
 I2C → LIN → CAN → SPI
 
 SimpleTemperatureMonitor
-→ (LIN)
+   → (LIN)
 BatteryTemperatureVehicleModule
-→ (CAN)
+   → (CAN)
 DataLoggingVehicleModule
-→ (SPI Flash)
-
+   → (SPI Flash)
+```
 ---
 
 ## Getting Started
@@ -58,7 +59,7 @@ DataLoggingVehicleModule
 ### Build the project
 
 ```
-bash
+</> Bash
 mkdir build
 cd build
 cmake ..
@@ -70,6 +71,7 @@ make
 Run each module in a separate terminal:
 
 ```
+</> Bash
 ./SimpleSensorMonitor
 ./BatteryTemperatureVehicleModule
 ./DataLoggingVehicleModule
@@ -83,10 +85,10 @@ Run each module in a separate terminal:
 
 System behavior was validated by:
 
-Verifying I2C temperature reads
-Observing LIN communication between sensor and battery module
-Confirming CAN request/response behavior
-Validating SPI flash page writes
+- Verifying I2C temperature reads
+- Observing LIN communication between sensor and battery module
+- Confirming CAN request/response behavior
+- Validating SPI flash page writes
 
 Example output from DataLoggingVehicleModule:
 
